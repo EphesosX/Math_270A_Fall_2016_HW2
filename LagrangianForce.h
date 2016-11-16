@@ -14,9 +14,7 @@ public:
   virtual T PotentialEnergy(const TVect& x){return (T)0;}
   virtual void AddForce(TVect& force,const TVect& x,T scale=(T)1){}
   virtual void AddForceDerivative(SymmetricTridiagonal<T>& A,const TVect& x,T scale=(T)1){}
-  virtual void AddForceDifferential(TVect& df,const TVect& x,const TVect& dx,T scale=(T)1){
-
-  }
+  virtual void AddForceDifferential(TVect& df,const TVect& x,const TVect& dx,T scale=(T)1){}
 };
 
 template <class T>
@@ -94,8 +92,8 @@ public:
   void AddForce(TVect& force,const TVect& x,T scale=(T)1){
     for(int e=0;e<N-1;e++){
       T P;cons_model.P(P,F(x,e));
-      force(e)-=scale*P;
-      force(e+1)+=scale*P;
+      force(e)+=scale*P;
+      force(e+1)-=scale*P;
     }
   }
 
@@ -103,7 +101,8 @@ public:
     for(int e=0;e<N-1;e++){
       T dPdF;cons_model.dPdF(dPdF,F(x,e));
       TMat2 element_stiffness;
-      element_stiffness << -scale*dPdF/dX,scale*dPdF/dX,scale*dPdF/dX,-scale*dPdF/dX;
+      T entry=scale*dPdF/dX;
+      element_stiffness << -entry,entry,entry,-entry;
       for(int i=0;i<2;i++){
         for(int j=i;j<2;j++){
           A(e+i,e+j)+=element_stiffness(i,j);}}
@@ -116,7 +115,8 @@ public:
     for(int e=0;e<N-1;e++){
       T dPdF;cons_model.dPdF(dPdF,F(x,e));
       TMat2 element_stiffness;
-      element_stiffness << -scale*dPdF/dX,scale*dPdF/dX,scale*dPdF/dX,-scale*dPdF/dX;
+      T entry=dPdF/dX;
+      element_stiffness << -entry,entry,entry,-entry;
       for(int i=0;i<2;i++){
         for(int j=i;j<2;j++){
           dfdx(e+i,e+j)+=element_stiffness(i,j);}}

@@ -14,8 +14,7 @@ void EnergyTest(){
   JIXIE::NeoHookean<T> nh((T)1);
   JIXIE::LinearElasticity<T> le((T)1);
   JIXIE::FEMHyperelasticity<T> fem(a,dX,N,nh);
-  TVect x(N),f(N);
-  f=TVect::Zero(N);
+  TVect x(N);
   for(int i=0;i<N;i++) x(i)=a+dX*(T)i;
 
   JIXIE::EnergyTest<T> et("output",fem,10);
@@ -31,8 +30,9 @@ void ElasticitySimulation(){
   T dX=(b-a)/(T)(N-1);
   T dt=(T).01;
   std::string output_dir("output");
-  JIXIE::ElasticityDriver<T> driver((T)1,30,dt,N,a,dX,output_dir);
-  driver.RunSimulation();
+  JIXIE::ElasticityDriver<T> driver((T)5,30,dt,N,a,dX,output_dir);
+  bool verbose=true;
+  driver.RunSimulation(verbose);
 }
 
 void ConvertBinaryToDat(){
@@ -58,5 +58,5 @@ int main()
 {
   //EnergyTest();
   ElasticitySimulation();
-  //ConvertBinaryToDat();
+  ConvertBinaryToDat();
 }
