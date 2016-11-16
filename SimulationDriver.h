@@ -174,7 +174,7 @@ public:
       lf->AddForce(residual,x_np1,dt*dt);
       T norm=(T)0;for(int i=0;i<N;i++) norm+=residual(i)*residual(i)/mass(i);
       norm=sqrt(norm);
-      std::cout << "Newton residual at iteration " << it << " = " << norm << std::endl;
+      //std::cout << "Newton residual at iteration " << it << " = " << norm << std::endl;
       be_matrix.SetToZero();
       for(int i=0;i<N;i++) be_matrix(i,i)=mass(i);
       lf->AddForceDerivative(be_matrix,x_np1,-dt*dt);
