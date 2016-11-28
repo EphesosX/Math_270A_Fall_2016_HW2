@@ -57,6 +57,17 @@ inline void Write_DAT_File(std::string file,const Eigen::VectorXd& array){
 }
 
 namespace JIXIE{
+
+template <class T>
+class SimulationParameters{
+public:
+  T final_time;
+  int frames_per_second;
+  T dt;
+  std::string output_dir;
+  SimulationParameters(){}
+};
+
 template <class T>
 class SimulationDriver{
 public:
@@ -72,6 +83,9 @@ std::string output_directory;
       dt_target=dt_frame;
     dt=dt_target;
   }
+
+  SimulationDriver(SimulationParameters<T>& parameters):
+  SimulationDriver(parameters.final_time,parameters.frames_per_second,parameters.dt,parameters.output_dir){}
 
   virtual void Set_Dt(bool& write_frame){
     dt=dt_target;
@@ -105,7 +119,7 @@ std::string output_directory;
   virtual void Write_State(const int number,std::string& simulation_data_filename){}
   virtual bool Read_State(const int number,std::string& simulation_data_filename){return false;}
 
-  virtual void Advance_One_Time_Step(){
+  virtual void Advance_One_Time_Step(const bool verbose){
     time+=dt;
   }
 
@@ -117,10 +131,24 @@ std::string output_directory;
         std::cout << "Time = " << time << ", frame = " << current_frame << ", dt = " << dt << std::endl;
       bool write_to_file=false;
       Set_Dt(write_to_file);
-      Advance_One_Time_Step();
+      Advance_One_Time_Step(verbose);
       if(write_to_file) WriteState(current_frame);
     }
   }
+};
+
+template <class T>
+class ElasticityParameters:public SimulationParameters<T>{
+public:
+  int N;
+  T a;
+  T dX;
+  T rho;
+  T k;
+  T Newton_tol;
+  int max_newton_it;
+
+  ElasticityParameters(){}
 };
 
 template <class T>
@@ -133,16 +161,19 @@ class ElasticityDriver: public SimulationDriver<T>{
   T a,dX;
   T rho,k;
   TVect x_n,x_np1,v_n,x_hat,residual,mass,delta;
-  T Newton_tol,max_newton_it;
+  T Newton_tol;
+  int max_newton_it;
   ConstitutiveModel<T>* cons_model;
   LagrangianForces<T>* lf;
   SymmetricTridiagonal<T> be_matrix;
 public:
-  ElasticityDriver(const T final_time_input,const int frames_per_second_input,const T dt_input,const int N_input,const T a_input,const T dX_input,std::string& output_dir):
-  SimulationDriver<T>(final_time_input,frames_per_second_input,dt_input,output_dir),N(N_input),a(a_input),dX(dX_input),
-  rho((T)1),k((T)100),x_n(N_input),x_np1(N_input),v_n(N_input),x_hat(N_input),residual(N_input),mass(N_input),delta(N_input),
-  Newton_tol((T)1e-5),max_newton_it(10),be_matrix(N){
-    cons_model=new LinearElasticity<T>(k);
+
+  ElasticityDriver(ElasticityParameters<T>& parameters):
+  SimulationDriver<T>(parameters),N(parameters.N),a(parameters.a),dX(parameters.dX),
+  rho(parameters.rho),k(parameters.k),x_n(parameters.N),x_np1(parameters.N),v_n(parameters.N),x_hat(parameters.N),residual(parameters.N),mass(parameters.N),delta(parameters.N),
+  Newton_tol(parameters.Newton_tol),max_newton_it(parameters.max_newton_it),be_matrix(parameters.N){
+    //cons_model=new LinearElasticity<T>(k);
+    cons_model=new NeoHookean<T>(k);
     lf=new FEMHyperelasticity<T>(a,dX,N,*cons_model);
   }
 
@@ -154,17 +185,19 @@ public:
   void Initialize(){
     //set intiial positions and velocity
     for(int i=0;i<N;i++){
-      x_n(i)=(T).7*(a+(T)i*dX);
+      T x=(a+(T)i*dX);
+      x_n(i)=(T).7*x;
       v_n(i)=(T)0;
     }
     //intialize mass lumped mass matrix from density
     for(int e=0;e<N-1;e++){
-      mass(e)+=rho*dX;
-      mass(e+1)+=rho*dX;}
+      mass(e)+=(T).5*rho*dX;
+      mass(e+1)+=(T).5*rho*dX;}
+
     SimulationDriver<T>::Initialize();
   }
 
-  virtual void Advance_One_Time_Step(){
+  virtual void Advance_One_Time_Step(const bool verbose){
     time+=dt;
     x_hat=x_n+dt*v_n;
     x_np1=x_n;//initial guess
@@ -174,14 +207,22 @@ public:
       lf->AddForce(residual,x_np1,dt*dt);
       T norm=(T)0;for(int i=0;i<N;i++) norm+=residual(i)*residual(i)/mass(i);
       norm=sqrt(norm);
-      //std::cout << "Newton residual at iteration " << it << " = " << norm << std::endl;
+      if(verbose)
+        std::cout << "Newton residual at iteration " << it << " = " << norm << std::endl;
+      if(norm<Newton_tol){
+        Exit_BE();
+        return;}
       be_matrix.SetToZero();
       for(int i=0;i<N;i++) be_matrix(i,i)=mass(i);
       lf->AddForceDerivative(be_matrix,x_np1,-dt*dt);
       be_matrix.QRSolve(delta,residual);
       x_np1+=delta;
     }
-    v_n=(T)1/dt*(x_np1-x_n);
+    Exit_BE();
+  }
+
+  void Exit_BE(){
+    v_n=((T)1/dt)*(x_np1-x_n);
     x_n=x_np1;
   }
 
