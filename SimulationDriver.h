@@ -146,6 +146,8 @@ public:
   T rho;
   T k;
   T Newton_tol;
+  // added variable for non-zero BC
+  T c;
   int max_newton_it;
 
   ElasticityParameters(){}
@@ -163,6 +165,7 @@ class ElasticityDriver: public SimulationDriver<T>{
   TVect x_n,x_np1,v_n,x_hat,residual,mass,delta;
   T Newton_tol;
   int max_newton_it;
+  T c; // added variable for non-zero BC
   ConstitutiveModel<T>* cons_model;
   LagrangianForces<T>* lf;
   SymmetricTridiagonal<T> be_matrix;
@@ -171,9 +174,9 @@ public:
   ElasticityDriver(ElasticityParameters<T>& parameters):
   SimulationDriver<T>(parameters),N(parameters.N),a(parameters.a),dX(parameters.dX),
   rho(parameters.rho),k(parameters.k),x_n(parameters.N),x_np1(parameters.N),v_n(parameters.N),x_hat(parameters.N),residual(parameters.N),mass(parameters.N),delta(parameters.N),
-  Newton_tol(parameters.Newton_tol),max_newton_it(parameters.max_newton_it),be_matrix(parameters.N){
-    //cons_model=new LinearElasticity<T>(k);
-    cons_model=new NeoHookean<T>(k);
+  Newton_tol(parameters.Newton_tol),max_newton_it(parameters.max_newton_it),c(parameters.c),be_matrix(parameters.N){
+    cons_model=new LinearElasticity<T>(k);
+    //cons_model=new NeoHookean<T>(k);
     lf=new FEMHyperelasticity<T>(a,dX,N,*cons_model);
   }
 
@@ -203,7 +206,9 @@ public:
     x_np1=x_n;//initial guess
 
     for(int it=1;it<max_newton_it;it++){
-      residual=mass.asDiagonal()*(x_hat-x_np1);
+	  residual=mass.asDiagonal()*(x_hat-x_np1);
+	  // add right boundary term
+	  residual(N-1) -= c*dt*dt;
       lf->AddForce(residual,x_np1,dt*dt);
       T norm=(T)0;for(int i=0;i<N;i++) norm+=residual(i)*residual(i)/mass(i);
       norm=sqrt(norm);
@@ -216,6 +221,7 @@ public:
       for(int i=0;i<N;i++) be_matrix(i,i)=mass(i);
       lf->AddForceDerivative(be_matrix,x_np1,-dt*dt);
       be_matrix.QRSolve(delta,residual);
+	  delta(0) = 0; // left boundary: prevent change to left side
       x_np1+=delta;
     }
     Exit_BE();

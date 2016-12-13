@@ -32,6 +32,9 @@ void ElasticitySimulation(){
   parameters.N=20;
   parameters.a=(T)0;
   T b=(T)1;
+
+  parameters.c = (T)0.1; // added non-zero BC term
+
   parameters.dX=(b-parameters.a)/(T)(parameters.N-1);
   parameters.dt=(T).01;
   parameters.output_dir=std::string("output");
