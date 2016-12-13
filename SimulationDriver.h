@@ -186,6 +186,8 @@ public:
   }
 
   void Initialize(){
+	//implies a=0; a is forced by ICs
+
     //set intiial positions and velocity
     for(int i=0;i<N;i++){
       T x=(a+(T)i*dX);
