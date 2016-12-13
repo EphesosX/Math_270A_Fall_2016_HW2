@@ -210,6 +210,7 @@ public:
 	  // add right boundary term
 	  residual(N-1) -= c*dt*dt;
       lf->AddForce(residual,x_np1,dt*dt);
+	  residual(0) = 0;
       T norm=(T)0;for(int i=0;i<N;i++) norm+=residual(i)*residual(i)/mass(i);
       norm=sqrt(norm);
       if(verbose)
@@ -220,8 +221,9 @@ public:
       be_matrix.SetToZero();
       for(int i=0;i<N;i++) be_matrix(i,i)=mass(i);
       lf->AddForceDerivative(be_matrix,x_np1,-dt*dt);
-      be_matrix.QRSolve(delta,residual);
-	  delta(0) = 0; // left boundary: prevent change to left side
+	  be_matrix(0, 0) = 1;
+	  be_matrix(0, 1) = 0; //force it to solve to 0
+	  be_matrix.QRSolve(delta,residual);
       x_np1+=delta;
     }
     Exit_BE();
